@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>أرشيف الصور - المكتبة الرقمية</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="site-header" id="site-header"></header>
+
+<section class="section">
+  <div class="container">
+    <h3 class="section-title">أرشيف الصور والفعاليات</h3>
+    <p class="section-sub">صور الأنشطة والرحلات والمسابقات والاحتفالات المدرسية</p>
+    <div id="albums" class="grid-items"><div class="loading">جاري التحميل...</div></div>
+  </div>
+</section>
+
+<footer class="site-footer" id="site-footer"></footer>
+
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+async function load() {
+  const wrap = document.getElementById("albums");
+  try {
+    const res = await apiRequest("/photos/albums");
+    if (!res.data.length) { wrap.innerHTML = `<div class="empty-state">لا توجد ألبومات مضافة بعد</div>`; return; }
+    wrap.innerHTML = res.data.map(a => `
+      <a class="item-card" href="/album.html?id=${a._id}">
+        ${a.coverUrl ? `<img class="item-cover" src="${escapeHtml(a.coverUrl)}">` : `<div class="item-cover-fallback">🖼️</div>`}
+        <div class="item-body">
+          <h4>${escapeHtml(a.title)}</h4>
+          <p class="item-desc">${escapeHtml((a.description||"").slice(0,70))}</p>
+          <span class="item-meta">${formatDate(a.eventDate)}</span>
+        </div>
+      </a>`).join("");
+  } catch { wrap.innerHTML = `<div class="empty-state">تعذر تحميل الألبومات</div>`; }
+}
+(async () => { await renderLayout(); load(); })();
+</script>
+</body>
+</html>

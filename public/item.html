@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title id="page-title">عرض المحتوى - المكتبة الرقمية</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="site-header" id="site-header"></header>
+
+<section class="section">
+  <div class="container" id="detail-wrap">
+    <div class="loading">جاري التحميل...</div>
+  </div>
+</section>
+
+<footer class="site-footer" id="site-footer"></footer>
+
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+const TYPE = qs("type") || "books";
+const ID = qs("id");
+const ICONS = { books: "📗", magazines: "📰", resources: "🧰", news: "📅" };
+
+function isPdf(url) { return url && url.toLowerCase().includes(".pdf"); }
+function isImage(url) { return url && /\.(jpg|jpeg|png|webp|gif)(\?|$)/i.test(url); }
+function isVideo(url) { return url && /\.(mp4|mov|webm)(\?|$)/i.test(url); }
+
+async function load() {
+  const wrap = document.getElementById("detail-wrap");
+  if (!ID) { wrap.innerHTML = `<div class="empty-state">عنصر غير محدد</div>`; return; }
+  try {
+    const res = await apiRequest(`/${TYPE}/${ID}`);
+    render(res.data);
+  } catch (err) {
+    wrap.innerHTML = `<div class="empty-state">تعذر إيجاد هذا المحتوى، ربما تم حذفه</div>`;
+  }
+}
+
+function render(it) {
+  document.getElementById("page-title").textContent = it.title + " - المكتبة الرقمية";
+  const cover = it.coverUrl || it.thumbnailUrl;
+  const fileUrl = it.fileUrl || "";
+  const canDownload = it.allowDownload !== false;
+
+  let readerHtml = "";
+  if (fileUrl) {
+    if (isPdf(fileUrl)) {
+      readerHtml = `<iframe class="reader-frame" src="${escapeHtml(fileUrl)}"></iframe>`;
+    } else if (isVideo(fileUrl)) {
+      readerHtml = `<video class="reader-frame" controls src="${escapeHtml(fileUrl)}"></video>`;
+    } else if (isImage(fileUrl)) {
+      readerHtml = `<img class="reader-frame" style="height:auto;object-fit:contain" src="${escapeHtml(fileUrl)}">`;
+    }
+  }
+
+  const metaBits = [it.author, it.stage, it.grade, it.subject, it.resourceType, it.issueNumber]
+    .filter(Boolean).map(m => `<span class="item-tag">${escapeHtml(m)}</span>`).join("");
+
+  {
+    document.getElementById("detail-wrap").innerHTML = `
+    <div class="detail-wrap">
+      <div class="detail-cover">
+        ${cover ? `<img src="${escapeHtml(cover)}">` : `<div class="item-cover-fallback" style="height:280px;border-radius:14px">${ICONS[TYPE] || "📄"}</div>`}
+      </div>
+      <div class="detail-info">
+        <h2>${escapeHtml(it.title)}</h2>
+        <div class="detail-meta">${metaBits}</div>
+        <p>${escapeHtml(it.description || it.summary || it.content || "لا يوجد وصف لهذا العنصر")}</p>
+        <div class="item-actions" style="padding:0;gap:10px">
+          ${fileUrl ? `<a class="btn btn-primary" target="_blank" href="${escapeHtml(fileUrl)}">فتح في نافذة جديدة</a>` : ""}
+          ${fileUrl && canDownload ? `<a class="btn btn-outline" download target="_blank" href="${escapeHtml(fileUrl)}">تحميل</a>` : ""}
+          ${it.externalLink ? `<a class="btn btn-outline" target="_blank" href="${escapeHtml(it.externalLink)}">رابط خارجي</a>` : ""}
+        </div>
+        <span class="item-meta">أُضيف بتاريخ: ${formatDate(it.createdAt)} ${it.views !== undefined ? " · 👁️ " + it.views + " مشاهدة" : ""}</span>
+      </div>
+    </div>
+    ${readerHtml}
+    ${it.content ? `<div class="section" style="padding:20px 0 0"><h3 class="section-title">التفاصيل الكاملة</h3><p>${escapeHtml(it.content)}</p></div>` : ""}
+    `;
+  }
+}
+
+(async () => {
+  await renderLayout();
+  load();
+})();
+</script>
+</body>
+</html>

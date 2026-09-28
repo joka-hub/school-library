@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>نتائج البحث - المكتبة الرقمية</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="site-header" id="site-header"></header>
+
+<section class="section">
+  <div class="container">
+    <h3 class="section-title">البحث في المكتبة</h3>
+    <form class="search-bar" id="search-form">
+      <input type="text" id="q" placeholder="ابحث عن اسم كتاب، مجلة، مورد، كلمة مفتاحية...">
+      <button class="btn btn-primary" type="submit">بحث</button>
+    </form>
+    <div id="results"></div>
+  </div>
+</section>
+
+<footer class="site-footer" id="site-footer"></footer>
+
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+const GROUPS = [
+  { key: "books", label: "📗 الكتب", type: "books" },
+  { key: "magazines", label: "📰 المجلات", type: "magazines" },
+  { key: "resources", label: "🧰 الموارد التعليمية", type: "resources" },
+  { key: "news", label: "📅 الأخبار", type: "news" },
+];
+
+function renderGroup(g, items) {
+  if (!items || !items.length) return "";
+  return `
+    <div class="section" style="padding-top:26px">
+      <h4 class="section-title" style="font-size:17px">${g.label} (${items.length})</h4>
+      <div class="grid-items">
+        ${items.map(it => `
+          <div class="item-card">
+            ${it.coverUrl || it.thumbnailUrl ? `<img class="item-cover" src="${escapeHtml(it.coverUrl || it.thumbnailUrl)}">` : `<div class="item-cover-fallback">📄</div>`}
+            <div class="item-body">
+              <h4>${escapeHtml(it.title)}</h4>
+              <p class="item-desc">${escapeHtml((it.description || it.summary || "").slice(0,70))}</p>
+            </div>
+            <div class="item-actions"><a class="btn btn-primary btn-block" href="/item.html?type=${g.type}&id=${it._id}">عرض</a></div>
+          </div>`).join("")}
+      </div>
+    </div>`;
+}
+
+async function doSearch(q) {
+  const wrap = document.getElementById("results");
+  if (!q) { wrap.innerHTML = ""; return; }
+  wrap.innerHTML = `<div class="loading">جاري البحث...</div>`;
+  try {
+    const res = await apiRequest(`/search?q=${encodeURIComponent(q)}`);
+    const html = GROUPS.map(g => renderGroup(g, res.data[g.key])).join("");
+    wrap.innerHTML = html || `<div class="empty-state">لا توجد نتائج مطابقة لـ "${escapeHtml(q)}"</div>`;
+  } catch {
+    wrap.innerHTML = `<div class="empty-state">تعذر تنفيذ البحث الآن</div>`;
+  }
+}
+
+(async () => {
+  await renderLayout();
+  const initial = qs("q") || "";
+  document.getElementById("q").value = initial;
+  document.getElementById("search-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const q = document.getElementById("q").value.trim();
+    history.replaceState(null, "", "/search.html?q=" + encodeURIComponent(q));
+    doSearch(q);
+  });
+  if (initial) doSearch(initial);
+})();
+</script>
+</body>
+</html>

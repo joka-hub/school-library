@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>المكتبة الرقمية لمدرسة قومية العجوزة</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="site-header" id="site-header"></header>
+
+<section class="hero">
+  <div class="container">
+    <h2>مرحبًا بكم في المكتبة الرقمية لمدرسة قومية العجوزة</h2>
+    <p id="hero-desc">مصادر تعليمية، مجلات إلكترونية، كتب، صور ومواد رقمية في مكان واحد.</p>
+    <form class="hero-search" onsubmit="event.preventDefault(); location.href='/search.html?q='+encodeURIComponent(this.q.value)">
+      <input name="q" placeholder="ابحث عن كتاب، مجلة، مورد تعليمي...">
+      <button type="submit">بحث</button>
+    </form>
+    <a href="/section.html?type=books" class="btn-explore">استكشف المكتبة</a>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <h3 class="section-title">أقسام المكتبة</h3>
+    <p class="section-sub">اختاري القسم اللي عايزة تدخليه</p>
+    <div class="grid-cards">
+      <a class="category-card" href="/section.html?type=books"><div class="icon">📗</div><h3>الكتب الرقمية</h3><p>كتب دراسية ومنهجية لكل الصفوف</p></a>
+      <a class="category-card" href="/section.html?type=magazines"><div class="icon">📰</div><h3>المجلات الإلكترونية</h3><p>مجلة المدرسة والإصدارات الدورية</p></a>
+      <a class="category-card" href="/section.html?type=resources"><div class="icon">🧰</div><h3>الموارد التعليمية</h3><p>أوراق عمل، عروض، فيديوهات وأنشطة</p></a>
+      <a class="category-card" href="/photos.html"><div class="icon">🖼️</div><h3>الصور والأرشيف</h3><p>صور الأنشطة والرحلات والفعاليات</p></a>
+      <a class="category-card" href="/section.html?type=resources&section=ركن المعلم"><div class="icon">🍎</div><h3>ركن المعلم</h3><p>خطط دروس وأدوات وتدريب للمعلمين</p></a>
+      <a class="category-card" href="/section.html?type=resources&section=ركن الطالب"><div class="icon">🎒</div><h3>ركن الطالب</h3><p>أنشطة وألعاب ومصادر للطلاب</p></a>
+      <a class="category-card" href="/section.html?type=resources&section=الذكاء الاصطناعي والتكنولوجيا"><div class="icon">🤖</div><h3>الذكاء الاصطناعي والتكنولوجيا</h3><p>أدوات وتدريب على الذكاء الاصطناعي</p></a>
+      <a class="category-card" href="/section.html?type=resources&section=المعارض الرقمية"><div class="icon">🏛️</div><h3>المعارض الرقمية</h3><p>مشروعات ومعارض الطلاب والمعلمين</p></a>
+      <a class="category-card" href="/section.html?type=books"><div class="icon">💻</div><h3>المكتبة الافتراضية</h3><p>تصفح كل الكتب أونلاين</p></a>
+      <a class="category-card" href="/section.html?type=news"><div class="icon">📅</div><h3>أخبار وفعاليات المدرسة</h3><p>آخر أخبار وأنشطة المدرسة</p></a>
+    </div>
+  </div>
+</section>
+
+<section class="section" style="padding-top:0">
+  <div class="container">
+    <h3 class="section-title">أحدث الإضافات</h3>
+    <p class="section-sub">آخر ما تم إضافته للمكتبة</p>
+    <div id="latest-items" class="grid-items"><div class="loading">جاري التحميل...</div></div>
+  </div>
+</section>
+
+<footer class="site-footer" id="site-footer"></footer>
+
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+async function loadLatest() {
+  const wrap = document.getElementById("latest-items");
+  try {
+    const [books, magazines, resources] = await Promise.all([
+      apiRequest("/books?limit=3"),
+      apiRequest("/magazines?limit=3"),
+      apiRequest("/resources?limit=3"),
+    ]);
+    const items = [
+      ...books.data.map(b => ({ ...b, _type: "books", _icon: "📗", _label: "كتاب" })),
+      ...magazines.data.map(m => ({ ...m, _type: "magazines", _icon: "📰", _label: "مجلة" })),
+      ...resources.data.map(r => ({ ...r, _type: "resources", _icon: "🧰", _label: "مورد" })),
+    ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 6);
+
+    if (items.length === 0) {
+      wrap.innerHTML = `<div class="empty-state">لا يوجد محتوى مضاف بعد. سجّلي دخول كأدمن وابدئي بإضافة أول كتاب أو مورد 🎉</div>`;
+      return;
+    }
+
+    wrap.innerHTML = items.map(it => `
+      <div class="item-card">
+        ${it.coverUrl || it.thumbnailUrl
+          ? `<img class="item-cover" src="${escapeHtml(it.coverUrl || it.thumbnailUrl)}">`
+          : `<div class="item-cover-fallback">${it._icon}</div>`}
+        <div class="item-body">
+          <span class="item-tag">${it._label}</span>
+          <h4>${escapeHtml(it.title)}</h4>
+          <p class="item-desc">${escapeHtml((it.description || "").slice(0, 70))}</p>
+          <span class="item-meta">${formatDate(it.createdAt)}</span>
+        </div>
+        <div class="item-actions">
+          <a class="btn btn-primary btn-block" href="/item.html?type=${it._type}&id=${it._id}">عرض</a>
+        </div>
+      </div>`).join("");
+  } catch (err) {
+    wrap.innerHTML = `<div class="empty-state">تعذر تحميل أحدث الإضافات الآن</div>`;
+  }
+}
+
+(async () => {
+  const settings = await renderLayout();
+  if (settings.description) document.getElementById("hero-desc").textContent = settings.description;
+  loadLatest();
+})();
+</script>
+</body>
+</html>

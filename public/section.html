@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title id="page-title">القسم - المكتبة الرقمية</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="site-header" id="site-header"></header>
+
+<section class="section">
+  <div class="container">
+    <h3 class="section-title" id="section-title">القسم</h3>
+    <p class="section-sub" id="section-sub"></p>
+
+    <form class="search-bar" id="search-form">
+      <input type="text" id="q" placeholder="ابحث داخل هذا القسم...">
+      <button class="btn btn-primary" type="submit">بحث</button>
+    </form>
+
+    <div class="filters-bar" id="filters-bar"></div>
+
+    <div id="items" class="grid-items"><div class="loading">جاري التحميل...</div></div>
+    <div id="pagination" class="pagination"></div>
+  </div>
+</section>
+
+<footer class="site-footer" id="site-footer"></footer>
+
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+const TYPE = qs("type") || "books";
+const FIXED_SECTION = qs("section") || "";
+
+const TYPE_CONFIG = {
+  books: {
+    title: "الكتب الرقمية", sub: "تصفحي كل الكتب الدراسية والمنهجية", icon: "📗",
+    filters: [
+      { key: "stage", label: "المرحلة", options: ["ابتدائي", "إعدادي", "ثانوي"] },
+      { key: "subject", label: "المادة", type: "text" },
+      { key: "grade", label: "الصف", type: "text" },
+    ],
+  },
+  magazines: { title: "المجلات الإلكترونية", sub: "مجلة المدرسة والإصدارات الدورية", icon: "📰", filters: [] },
+  resources: {
+    title: FIXED_SECTION || "الموارد التعليمية", sub: "أوراق عمل، عروض، فيديوهات، أنشطة وأدوات", icon: "🧰",
+    filters: [
+      { key: "resourceType", label: "النوع", options: ["ورقة عمل","اختبار","عرض تقديمي","ملف PDF","فيديو","نشاط","رابط تعليمي","لعبة تعليمية","أداة ذكاء اصطناعي","دليل استخدام","خطة درس","أخرى"] },
+      { key: "subject", label: "المادة", type: "text" },
+      { key: "stage", label: "المرحلة", options: ["ابتدائي", "إعدادي", "ثانوي"] },
+    ],
+  },
+  news: { title: "أخبار وفعاليات المدرسة", sub: "آخر أخبار وأنشطة المدرسة", icon: "📅", filters: [] },
+};
+
+let currentPage = 1;
+const cfg = TYPE_CONFIG[TYPE] || TYPE_CONFIG.books;
+
+function buildFiltersBar() {
+  const bar = document.getElementById("filters-bar");
+  bar.innerHTML = cfg.filters.map(f => {
+    if (f.type === "text") {
+      return `<input data-filter="${f.key}" placeholder="${f.label}">`;
+    }
+    return `<select data-filter="${f.key}"><option value="">${f.label} (الكل)</option>${f.options.map(o => `<option value="${o}">${o}</option>`).join("")}</select>`;
+  }).join("");
+  bar.querySelectorAll("[data-filter]").forEach(el => {
+    el.addEventListener("change", () => loadItems(1));
+    if (el.tagName === "INPUT") el.addEventListener("keyup", (e) => { if (e.key === "Enter") loadItems(1); });
+  });
+}
+
+function getFilterParams() {
+  const params = new URLSearchParams();
+  document.querySelectorAll("[data-filter]").forEach(el => {
+    if (el.value) params.set(el.dataset.filter, el.value);
+  });
+  if (FIXED_SECTION) params.set("section", FIXED_SECTION);
+  const q = document.getElementById("q").value.trim();
+  if (q) params.set("q", q);
+  return params;
+}
+
+async function loadItems(page = 1) {
+  currentPage = page;
+  const wrap = document.getElementById("items");
+  wrap.innerHTML = `<div class="loading">جاري التحميل...</div>`;
+  try {
+    const params = getFilterParams();
+    params.set("page", page);
+    params.set("limit", 12);
+    const res = await apiRequest(`/${TYPE}?${params.toString()}`);
+    renderItems(res.data);
+    renderPagination(res.pagination);
+  } catch (err) {
+    wrap.innerHTML = `<div class="empty-state">تعذر تحميل المحتوى الآن، حاولي لاحقًا</div>`;
+  }
+}
+
+function renderItems(items) {
+  const wrap = document.getElementById("items");
+  if (!items || items.length === 0) {
+    wrap.innerHTML = `<div class="empty-state">لا توجد نتائج مطابقة حاليًا</div>`;
+    return;
+  }
+  wrap.innerHTML = items.map(it => {
+    const cover = it.coverUrl || it.thumbnailUrl;
+    const tag = it.subject || it.resourceType || it.stage || cfg.title;
+    return `
+    <div class="item-card">
+      ${cover ? `<img class="item-cover" src="${escapeHtml(cover)}">` : `<div class="item-cover-fallback">${cfg.icon}</div>`}
+      <div class="item-body">
+        <span class="item-tag">${escapeHtml(tag)}</span>
+        <h4>${escapeHtml(it.title)}</h4>
+        <p class="item-desc">${escapeHtml((it.description || it.summary || "").slice(0, 80))}</p>
+        <span class="item-meta">${formatDate(it.createdAt)}</span>
+      </div>
+      <div class="item-actions">
+        <a class="btn btn-primary btn-block" href="/item.html?type=${TYPE}&id=${it._id}">عرض</a>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function renderPagination(p) {
+  const el = document.getElementById("pagination");
+  if (!p || p.pages <= 1) { el.innerHTML = ""; return; }
+  let html = "";
+  for (let i = 1; i <= p.pages; i++) {
+    html += `<button class="${i === p.page ? "active" : ""}" onclick="loadItems(${i})">${i}</button>`;
+  }
+  el.innerHTML = html;
+}
+
+(async () => {
+  await renderLayout();
+  document.getElementById("page-title").textContent = cfg.title + " - المكتبة الرقمية";
+  document.getElementById("section-title").textContent = cfg.title;
+  document.getElementById("section-sub").textContent = cfg.sub;
+  buildFiltersBar();
+  document.getElementById("search-form").addEventListener("submit", (e) => { e.preventDefault(); loadItems(1); });
+  loadItems(1);
+})();
+</script>
+</body>
+</html>

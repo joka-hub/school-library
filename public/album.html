@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title id="page-title">ألبوم صور - المكتبة الرقمية</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="site-header" id="site-header"></header>
+
+<section class="section">
+  <div class="container">
+    <h3 class="section-title" id="album-title">ألبوم</h3>
+    <p class="section-sub" id="album-desc"></p>
+    <div id="gallery" class="gallery-grid"><div class="loading">جاري التحميل...</div></div>
+  </div>
+</section>
+
+<div class="lightbox" id="lightbox">
+  <button class="close" onclick="closeLightbox()">×</button>
+  <img id="lb-img" src="">
+  <div class="cap"><strong id="lb-title"></strong><p id="lb-desc"></p></div>
+</div>
+
+<footer class="site-footer" id="site-footer"></footer>
+
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+const ID = qs("id");
+let PHOTOS = [];
+
+function openLightbox(i) {
+  const p = PHOTOS[i];
+  document.getElementById("lb-img").src = p.imageUrl;
+  document.getElementById("lb-title").textContent = p.title || "";
+  document.getElementById("lb-desc").textContent = (p.description || "") + (p.eventDate ? " — " + formatDate(p.eventDate) : "");
+  document.getElementById("lightbox").classList.add("open");
+}
+function closeLightbox() { document.getElementById("lightbox").classList.remove("open"); }
+
+async function load() {
+  try {
+    const [album, photosRes] = await Promise.all([
+      apiRequest(`/photos/albums`).then(r => r.data.find(a => a._id === ID)),
+      apiRequest(`/photos/albums/${ID}/photos`),
+    ]);
+    document.getElementById("page-title").textContent = (album ? album.title : "ألبوم") + " - المكتبة الرقمية";
+    document.getElementById("album-title").textContent = album ? album.title : "ألبوم صور";
+    document.getElementById("album-desc").textContent = album ? album.description : "";
+
+    PHOTOS = photosRes.data;
+    const wrap = document.getElementById("gallery");
+    if (!PHOTOS.length) { wrap.innerHTML = `<div class="empty-state">لا توجد صور في هذا الألبوم بعد</div>`; return; }
+    wrap.innerHTML = PHOTOS.map((p, i) => `
+      <div class="gallery-thumb" onclick="openLightbox(${i})"><img src="${escapeHtml(p.imageUrl)}"></div>
+    `).join("");
+  } catch {
+    document.getElementById("gallery").innerHTML = `<div class="empty-state">تعذر تحميل الألبوم</div>`;
+  }
+}
+(async () => { await renderLayout(); load(); })();
+</script>
+</body>
+</html>
