@@ -6,9 +6,9 @@ const path = require("path");
 const connectDB = require("./config/db");
 const { notFound, errorHandler } = require("./middleware/errorHandler");
 
-const app = express();
+const Admin = require("./models/Admin");
 
-connectDB();
+const app = express();
 
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
@@ -42,7 +42,36 @@ app.get(/^(?!\/api).*/, (req, res) => {
 app.use("/api", notFound);
 app.use(errorHandler);
 
+// ===== إنشاء حساب الأدمن الأول تلقائيًا (لو مش موجود) =====
+// ده بديل لتشغيل أمر seed:admin يدويًا، لأن الخطة المجانية في Render
+// ما بتديش صلاحية الدخول على Shell.
+async function ensureFirstAdmin() {
+  try {
+    const username = (process.env.ADMIN_USERNAME || "admin").toLowerCase();
+    const existing = await Admin.findOne({ username });
+    if (existing) {
+      console.log(`ℹ️ حساب الأدمن "${username}" موجود بالفعل`);
+      return;
+    }
+    await Admin.create({
+      name: "المدير الرئيسي",
+      username,
+      email: process.env.ADMIN_EMAIL || "",
+      password: process.env.ADMIN_PASSWORD || "ChangeMe123!",
+      role: "owner",
+    });
+    console.log(`✅ تم إنشاء حساب الأدمن الأول: ${username}`);
+  } catch (err) {
+    console.error("❌ خطأ أثناء إنشاء حساب الأدمن:", err.message);
+  }
+}
+
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`🚀 السيرفر يعمل على المنفذ ${PORT}`);
-});
+
+(async () => {
+  await connectDB();
+  await ensureFirstAdmin();
+  app.listen(PORT, () => {
+    console.log(`🚀 السيرفر يعمل على المنفذ ${PORT}`);
+  });
+})();
